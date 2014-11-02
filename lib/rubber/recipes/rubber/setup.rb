@@ -331,7 +331,7 @@ namespace :rubber do
       rubber_records = {}
       records.each do |record|
         record = Rubber::Util.symbolize_keys(record)
-        record = provider.setup_opts(record) # assign defaults        
+        record = provider.setup_opts(record) # assign defaults
         key = record_key(record)
         rubber_records[key] ||= []
         rubber_records[key] << record
@@ -577,12 +577,16 @@ namespace :rubber do
   DESC
   task :enable_multiverse do
     sudo_script 'enable_multiverse', <<-ENDSCRIPT
-      if ! grep -qc multiverse /etc/apt/sources.list /etc/apt/sources.list.d/* &> /dev/null; then
-        cat /etc/apt/sources.list | sed 's/main universe/multiverse/' > /etc/apt/sources.list.d/rubber-multiverse-source.list
-      elif grep -q multiverse /etc/apt/sources.list &> /dev/null; then
-        cat /etc/apt/sources.list | sed -n '/multiverse$/s/^#\s*//p' > /etc/apt/sources.list.d/rubber-multiverse-source.list
-      fi
+      sudo sed -i -e 's/archive.ubuntu.com\|security.ubuntu.com\|us-east-1.ec2.old-releases.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
     ENDSCRIPT
+
+    # From within the sudo_script
+    # if ! grep -qc multiverse /etc/apt/sources.list /etc/apt/sources.list.d/* &> /dev/null; then
+    #   cat /etc/apt/sources.list | sed 's/main universe/multiverse/' > /etc/apt/sources.list.d/rubber-multiverse-source.list
+    # elif grep -q multiverse /etc/apt/sources.list &> /dev/null; then
+    #   cat /etc/apt/sources.list | sed -n '/multiverse$/s/^#\s*//p' > /etc/apt/sources.list.d/rubber-multiverse-source.list
+    # fi
+
   end
 
   def update_dyndns(instance_item)
@@ -602,7 +606,7 @@ namespace :rubber do
       end
     end
   end
-  
+
   def destroy_dyndns(instance_item)
     env = rubber_cfg.environment.bind(instance_item.role_names, instance_item.name)
     if env.dns_provider
@@ -644,35 +648,35 @@ namespace :rubber do
       end
     end
 
-    if upgrade
-      if ENV['NO_DIST_UPGRADE']
-        sudo_script 'upgrade_packages', <<-ENDSCRIPT
-          export DEBIAN_FRONTEND=noninteractive
-
-          #{apt_get_update_script}
-
-          apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes upgrade
-        ENDSCRIPT
-      else
-        sudo_script 'dist_upgrade_packages', <<-ENDSCRIPT
-          export DEBIAN_FRONTEND=noninteractive
-
-          #{apt_get_update_script}
-
-          apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes dist-upgrade
-        ENDSCRIPT
-      end
-    else
-      install_packages_script = <<-ENDSCRIPT
-        export DEBIAN_FRONTEND=noninteractive
-
-        #{apt_get_update_script}
-
-        apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes install $@
-      ENDSCRIPT
-
-      sudo_script 'install_packages', install_packages_script, opts.merge(:script_args => '$CAPISTRANO:VAR$')
-    end
+    # if upgrade
+    #   if ENV['NO_DIST_UPGRADE']
+    #     sudo_script 'upgrade_packages', <<-ENDSCRIPT
+    #       export DEBIAN_FRONTEND=noninteractive
+    #
+    #       #{apt_get_update_script}
+    #
+    #       apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes upgrade
+    #     ENDSCRIPT
+    #   else
+    #     sudo_script 'dist_upgrade_packages', <<-ENDSCRIPT
+    #       export DEBIAN_FRONTEND=noninteractive
+    #
+    #       #{apt_get_update_script}
+    #
+    #       apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes dist-upgrade
+    #     ENDSCRIPT
+    #   end
+    # else
+    #   install_packages_script = <<-ENDSCRIPT
+    #     export DEBIAN_FRONTEND=noninteractive
+    #
+    #     #{apt_get_update_script}
+    #
+    #     apt-get -q -o Dpkg::Options::=--force-confold -y --force-yes install $@
+    #   ENDSCRIPT
+    #
+    #   sudo_script 'install_packages', install_packages_script, opts.merge(:script_args => '$CAPISTRANO:VAR$')
+    # end
 
     maybe_reboot
   end
@@ -697,7 +701,7 @@ namespace :rubber do
     reboot_hosts = reboot_needed.collect {|k, v| v.strip.size > 0 ? k : nil}.compact.sort
 
     # Figure out which hosts are bootstrapping for the first time so we can auto reboot
-    # If there is no deployed app directory, then we have never bootstrapped. 
+    # If there is no deployed app directory, then we have never bootstrapped.
     auto_reboot = multi_capture("echo $(ls #{deploy_to} 2> /dev/null)")
     auto_reboot_hosts = auto_reboot.collect {|k, v| v.strip.size == 0 ? k : nil}.compact.sort
 
@@ -847,23 +851,23 @@ namespace :rubber do
 
   # Helper script that only issues an apt-get update command if the apt sources list has changed.
   def apt_get_update_script
-    <<-ENDSCRIPT
-      if [[ ! -f /tmp/apt_sources.md5 ]]; then
-        apt-get -q update
-
-        md5sum /etc/apt/sources.list > /tmp/apt_sources.md5
-        md5sum /etc/apt/sources.list.d/*.list >> /tmp/apt_sources.md5
-      else
-        md5sum /etc/apt/sources.list > /tmp/apt_sources_compare.md5
-        md5sum /etc/apt/sources.list.d/*.list >> /tmp/apt_sources_compare.md5
-
-        if [[ `diff /tmp/apt_sources.md5 /tmp/apt_sources_compare.md5` ]]; then
-          apt-get -q update
-        fi
-
-        mv /tmp/apt_sources_compare.md5 /tmp/apt_sources.md5
-      fi
-    ENDSCRIPT
+    # <<-ENDSCRIPT
+    #   if [[ ! -f /tmp/apt_sources.md5 ]]; then
+    #     apt-get -q update
+    #
+    #     md5sum /etc/apt/sources.list > /tmp/apt_sources.md5
+    #     md5sum /etc/apt/sources.list.d/*.list >> /tmp/apt_sources.md5
+    #   else
+    #     md5sum /etc/apt/sources.list > /tmp/apt_sources_compare.md5
+    #     md5sum /etc/apt/sources.list.d/*.list >> /tmp/apt_sources_compare.md5
+    #
+    #     if [[ `diff /tmp/apt_sources.md5 /tmp/apt_sources_compare.md5` ]]; then
+    #       apt-get -q update
+    #     fi
+    #
+    #     mv /tmp/apt_sources_compare.md5 /tmp/apt_sources.md5
+    #   fi
+    # ENDSCRIPT
   end
 
 end
